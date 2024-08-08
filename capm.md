@@ -1,4 +1,3 @@
-
 # CAPM Analysis
 
 ## Introduction
@@ -23,6 +22,14 @@ The CAPM provides a framework to understand the relationship between systematic 
 - We are using the `quantmod` package to directly load financial data from Yahoo Finance without the need to manually download and read from a CSV file.
 - `quantmod` stands for "Quantitative Financial Modelling Framework". It was developed to aid the quantitative trader in the development, testing, and deployment of statistically based trading models.
 - Make sure to install the `quantmod` package by running `install.packages("quantmod")` in the R console before proceeding.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(quantmod)
+library(ggplot2)
+library(tidyverse)
+```
 
 ```r
 # Set start and end dates
@@ -80,8 +87,11 @@ $$
 \text{Daily Return} = \frac{\text{Today's Price} - \text{Previous Trading Day's Price}}{\text{Previous Trading Day's Price}}
 $$
 
-```r
-#fill the code
+```{r return}
+df <- df %>%
+  mutate(AMD_Return = (AMD - lag(AMD)) / lag(AMD),
+         GSPC_Return = (GSPC - lag(GSPC)) / lag(GSPC)) %>%
+  na.omit()
 ```
 
 - **Calculate Risk-Free Rate**: Calculate the daily risk-free rate by conversion of annual risk-free Rate. This conversion accounts for the compounding effect over the days of the year and is calculated using the formula:
@@ -90,22 +100,26 @@ $$
 \text{Daily Risk-Free Rate} = \left(1 + \frac{\text{Annual Rate}}{100}\right)^{\frac{1}{360}} - 1
 $$
 
-```r
-#fill the code
+```{r riskfree}
+annual_rf_rate <- mean(df$RF)
+daily_rf_rate <- (1 + annual_rf_rate / 100)^(1 / 360) - 1
 ```
 
 
 - **Calculate Excess Returns**: Compute the excess returns for AMD and the S&P 500 by subtracting the daily risk-free rate from their respective returns.
 
-```r
-#fill the code
+```{r excess return}
+df <- df %>%
+  mutate(AMD_Excess_Return = AMD_Return - daily_rf_rate,
+         GSPC_Excess_Return = GSPC_Return - daily_rf_rate)
 ```
 
 
 - **Perform Regression Analysis**: Using linear regression, we estimate the beta (\(\beta\)) of AMD relative to the S&P 500. Here, the dependent variable is the excess return of AMD, and the independent variable is the excess return of the S&P 500. Beta measures the sensitivity of the stock's returns to fluctuations in the market.
 
-```r
-#fill the code
+```{r lm}
+capm_model <- lm(AMD_Excess_Return ~ GSPC_Excess_Return, data = df)
+summary(capm_model)
 ```
 
 
@@ -119,8 +133,15 @@ What is your \(\beta\)? Is AMD more volatile or less volatile than the market?
 #### Plotting the CAPM Line
 Plot the scatter plot of AMD vs. S&P 500 excess returns and add the CAPM regression line.
 
-```r
-#fill the code
+```{r plot}
+library(ggplot2)
+
+ggplot(df, aes(x = GSPC_Excess_Return, y = AMD_Excess_Return)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, col = "blue") +
+  labs(title = "CAPM Analysis: AMD vs S&P 500",
+       x = "S&P 500 Excess Return",
+       y = "AMD Excess Return")
 ```
 
 ### Step 3: Predictions Interval
@@ -130,6 +151,22 @@ Suppose the current risk-free rate is 5.0%, and the annual expected return for t
 
 **Answer:**
 
-```r
-#fill the code
+```{r pi}
+library(tidyverse)
+
+sf <- summary(capm_model)$sigma
+
+annual_sf <- sf * sqrt(252)
+
+mean_daily_return_amd <- mean(df$AMD_Excess_Return)
+
+annual_return_amd <- (1 + mean_daily_return_amd)^252 - 1
+
+z_value <- qnorm(0.95)
+
+lower_bound <- annual_return_amd - z_value * annual_sf
+upper_bound <- annual_return_amd + z_value * annual_sf
+
+cat("The lower bound of the prediction interval is", lower_bound, "\n")
+cat("The upper bound of the prediction interval is", upper_bound, "\n")
 ```
