@@ -58,28 +58,102 @@ Implement the trading algorithm as per the instructions. You should initialize n
   - If this is the last day of trading, set the 'trade_type' to 'sell'. In this case, also set the 'costs_proceeds' column to the total number in the `accumulated_shares` variable multiplied by the price of the last day.
 
 
-
-```r
-# Initialize columns for trade type, cost/proceeds, and accumulated shares in amd_df
+```{r trading}
 amd_df$trade_type <- NA
-amd_df$costs_proceeds <- NA  # Corrected column name
-amd_df$accumulated_shares <- 0  # Initialize if needed for tracking
+amd_df$costs_proceeds <- NA  
+amd_df$accumulated_shares <- 0  
 
-# Initialize variables for trading logic
 previous_price <- 0
 share_size <- 100
 accumulated_shares <- 0
 
 for (i in 1:nrow(amd_df)) {
-# Fill your code here
+  current_price <- amd_df$close[i]
+  
+  if (i == nrow(amd_df)) {
+    # On the last day, sell all remaining shares
+    amd_df$trade_type[i] <- "sell"
+    amd_df$costs_proceeds[i] <- current_price * accumulated_shares
+    accumulated_shares <- 0
+  } else {
+    if (previous_price == 0) {
+      # If the previous price is zero, buy 100 shares
+      amd_df$trade_type[i] <- "buy"
+      amd_df$costs_proceeds[i] <- -current_price * share_size
+      accumulated_shares <- accumulated_shares + share_size
+      cost_proceeds <- current_price * accumulated_shares
+    } else if (current_price < previous_price) {
+      # If current price is less than previous price, buy 100 shares
+      amd_df$trade_type[i] <- "buy"
+      amd_df$costs_proceeds[i] <- -current_price * share_size
+      accumulated_shares <- accumulated_shares + share_size
+      cost_proceeds <- current_price * accumulated_shares
+    } else {
+      amd_df$trade_type[i] <- " "
+      amd_df$costs_proceeds[i] <- 0
+      cost_proceeds <- current_price * accumulated_shares
+    }
+  }
+  
+  amd_df$accumulated_shares[i] <- accumulated_shares
+  
+  previous_price <- current_price
 }
 ```
 
-
 ### Step 3: Customize Trading Period
 - Define a trading period you wanted in the past five years 
-```r
-# Fill your code here
+```{r period}
+start_date <- as.Date('2023-11-01')
+end_date <- as.Date('2023-12-01')
+
+# Added codes from Step 1 and 2 to update the data frame every time date is adjusted
+amd_df <- read.csv("AMD.csv")
+
+amd_df$date <- as.Date(amd_df$Date)
+amd_df$close <- as.numeric(amd_df$Adj.Close)
+
+amd_df <- amd_df[, c("date", "close")]
+amd_df$trade_type <- NA
+amd_df$costs_proceeds <- NA  
+amd_df$accumulated_shares <- 0  
+
+previous_price <- 0
+share_size <- 100
+accumulated_shares <- 0
+
+amd_df <- amd_df[amd_df$date >= start_date & amd_df$date <= end_date, ]
+
+for (i in 1:nrow(amd_df)) {
+  current_price <- amd_df$close[i]
+  
+  if (i == nrow(amd_df)) {
+    # On the last day, sell all remaining shares
+    amd_df$trade_type[i] <- "sell"
+    amd_df$costs_proceeds[i] <- current_price * accumulated_shares
+    accumulated_shares <- 0
+  } else {
+    if (previous_price == 0) {
+      # If the previous price is zero, buy 100 shares
+      amd_df$trade_type[i] <- "buy"
+      amd_df$costs_proceeds[i] <- -current_price * share_size
+      accumulated_shares <- accumulated_shares + share_size
+    } else if (current_price < previous_price) {
+      # If current price is less than previous price, buy 100 shares
+      amd_df$trade_type[i] <- "buy"
+      amd_df$costs_proceeds[i] <- -current_price * share_size
+      accumulated_shares <- accumulated_shares + share_size
+    } else {
+      amd_df$trade_type[i] <- " "
+      amd_df$costs_proceeds[i] <- 0
+    }
+  }
+  
+  amd_df$accumulated_shares[i] <- accumulated_shares
+  
+  previous_price <- current_price
+}
+
 ```
 
 
@@ -90,8 +164,18 @@ After running your algorithm, check if the trades were executed as expected. Cal
 - Invested Capital: Calculate the total capital invested. This is equal to the sum of the 'costs_proceeds' values for all 'buy' transactions. Since these entries are negative (representing money spent), you should take the negative sum of these values to reflect the total amount invested.
 - ROI Formula: $$\text{ROI} = \left( \frac{\text{Total Profit or Loss}}{\text{Total Capital Invested}} \right) \times 100$$
 
-```r
-# Fill your code here
+```{r}
+total_profit_loss <- sum(amd_df$costs_proceeds, na.rm = TRUE)
+total_invested_capital <- -sum(amd_df$costs_proceeds[amd_df$trade_type == "buy"], na.rm = TRUE)
+
+total_invested_capital <- abs(total_invested_capital)
+
+roi <- (total_profit_loss / total_invested_capital) * 100
+
+cat("Total Profit/Loss: ", total_profit_loss, "USD\n")
+cat("Total Invested Capital: ", total_invested_capital, "USD\n")
+cat("Return on Investment: ", sprintf("%.2f%%", roi), "\n")
+
 ```
 
 ### Step 5: Profit-Taking Strategy or Stop-Loss Mechanisum (Choose 1)
@@ -99,8 +183,70 @@ After running your algorithm, check if the trades were executed as expected. Cal
 - Option 2: Implement a stop-loss mechanism in the trading strategy that you sell half of your holdings if the stock falls by a certain percentage (e.g., 20%) from the average purchase price. You don't need to buy 100 stocks on the days that the stop-loss mechanism is triggered.
 
 
-```r
-# Fill your code here
+```{r option}
+
+# Adjusted the code from Step 3 with the "dplyr" library.
+library(dplyr)
+
+amd_df <- read.csv("AMD.csv") %>%
+  mutate(
+    date = as.Date(Date),
+    close = as.numeric(Adj.Close),
+    trade_type = NA_character_,
+    costs_proceeds = NA_real_,
+    accumulated_shares = 0,
+    total_spent = 0,
+    average_purchase_price = 0
+  ) %>%
+  select(date, 
+         close, 
+         trade_type, 
+         costs_proceeds, 
+         accumulated_shares, 
+         total_spent, 
+         average_purchase_price)
+
+# Adjust the date here
+start_date <- as.Date('2023-11-01')
+end_date <- as.Date('2023-12-01')
+
+amd_df <- amd_df %>%
+  filter(date >= start_date & date <= end_date)
+
+previous_price <- 0
+share_size <- 100
+accumulated_shares <- 0
+total_spent <- 0
+
+for (i in 1:nrow(amd_df)) {
+  current_price <- amd_df$close[i]
+  
+  if (i == nrow(amd_df)) {
+    amd_df$trade_type[i] <- "sell"
+    amd_df$costs_proceeds[i] <- current_price * accumulated_shares
+    accumulated_shares <- 0
+  } else {
+    if (previous_price == 0 || current_price < previous_price) {
+      amd_df$trade_type[i] <- "buy"
+      amd_df$costs_proceeds[i] <- -current_price * share_size
+      accumulated_shares <- accumulated_shares + share_size
+      total_spent <- total_spent + current_price * share_size
+    # Implementation of Option 1:
+    } else if (current_price >= 1.20 * amd_df$average_purchase_price[i - 1] && accumulated_shares > 0) {
+      shares_to_sell <- accumulated_shares / 2
+      amd_df$trade_type[i] <- "sell"
+      amd_df$costs_proceeds[i] <- current_price * shares_to_sell
+      accumulated_shares <- accumulated_shares - shares_to_sell
+      total_spent <- accumulated_shares * amd_df$average_purchase_price[i - 1]
+    }
+  }
+  
+  amd_df$total_spent[i] <- total_spent
+  amd_df$average_purchase_price[i] <- if (accumulated_shares > 0) total_spent / accumulated_shares else 0
+  amd_df$accumulated_shares[i] <- accumulated_shares
+  previous_price <- current_price
+}
+
 ```
 
 
@@ -108,12 +254,37 @@ After running your algorithm, check if the trades were executed as expected. Cal
 - Did your P/L and ROI improve over your chosen period?
 - Relate your results to a relevant market event and explain why these outcomes may have occurred.
 
+## Financial Performance Analysis
 
-```r
-# Fill your code here and Disucss
+```{r financial-calculation}
+total_profit_loss <- sum(amd_df$costs_proceeds, na.rm = TRUE)
+total_invested_capital <- -sum(amd_df$costs_proceeds[amd_df$trade_type == "buy"], na.rm = TRUE)
+
+total_invested_capital <- abs(total_invested_capital)
+
+roi <- (total_profit_loss / total_invested_capital) * 100
+
+cat("Total Profit/Loss: ", total_profit_loss, "USD\n")
+cat("Total Invested Capital: ", total_invested_capital, "USD\n")
+cat("Return on Investment: ", sprintf("%.2f%%", roi), "\n")
 ```
 
-Sample Discussion: On Wednesday, December 6, 2023, AMD CEO Lisa Su discussed a new graphics processor designed for AI servers, with Microsoft and Meta as committed users. The rise in AMD shares on the following Thursday suggests that investors believe in the chipmaker's upward potential and market expectations; My first strategy earned X dollars more than second strategy on this day, therefore providing a better ROI.
+## Market Events Impact
+
+In late 2023, AMD made significant announcements regarding its future in AI chip technology, specifically projecting \$2 billion in sales from its new MI300X chip designed to compete with Nvidia in data centers. This projection came despite a quarterly financial outlook that missed expectations, impacted by weak gaming market performance and reduced demand in some chip segments.
+
+## Impact on AMD shares
+
+Despite a drop in after-market trading due to a less optimistic quarterly outlook, AMD's share prices stabilized after the announcement of the MI300X sales projections. This news was likely received positively by the market due to the potential growth in the lucrative AI chip sector.
+
+```{r}
+post_announcement <- filter(amd_df, date >= as.Date("2023-11-01") & date <= as.Date("2023-12-01"))
+increase_in_value <- max(post_announcement$close) - min(post_announcement$close)
+
+cat("Increase in stock value within a month after the announcement: ", increase_in_value, "USD\n")
+```
+
+
 
 
 
