@@ -5,7 +5,7 @@
 
 # Introduction to Actuarial Studies 
 
-_"Tell me and I forget. Teach me and I remember. Involve me and I learn" - Benjamin Franklin_
+_"Wisdom is not a product of schooling but of the lifelong attempt to acquire it." - Albert Einstein_
 
 ---
 ![Quest Guide](quest.jpg)
@@ -37,7 +37,7 @@ This is written in markdown language.
 ---
 **Testimonial:**
 
-**Ivan Prajna Susanto:** (Change to your name)
+**Ivan Prajna Susanto:**
 
 Throughout ACTL1101, I have mastered the topics listed in principles of actuarial science, and the coding assignment work is mine. I feel much more prepared for my future career.
 
